@@ -1,0 +1,43 @@
+name: Deploy to Azure Web App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: shm
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v1
+      with:
+        registry: ${{ env.DOCKER_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
